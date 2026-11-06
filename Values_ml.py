@@ -1,4 +1,4 @@
-# Breast Cancer Prediction — Traditional Machine Learning
+# TumorTrace — Traditional Machine Learning
 
 # ============================================================
 
@@ -9,6 +9,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import joblib
 
 # Machine Learning models
 
@@ -190,7 +191,6 @@ models = [
     "SVM",
     SVC(
         gamma="auto",
-        probability=True,
         random_state=0
     )
 )
@@ -334,6 +334,18 @@ y_train
 )
 
 # ============================================================
+# SAVE THE TRAINED MODEL
+# ============================================================
+
+joblib.dump(
+    final_pipeline,
+    "best_tabular_model.joblib"
+)
+
+print("\nTrained model saved successfully!")
+print("Model file: best_tabular_model.joblib")
+
+# ============================================================
 
 # 12. PREDICT ON THE UNSEEN TEST DATA
 
@@ -344,6 +356,63 @@ y_pred = final_pipeline.predict(X_test)
 # Probability of malignant class
 
 y_probability = final_pipeline.predict_proba(X_test)[:, 1]
+
+
+# ============================================================
+# 12A. COMPARISON OF ALL MODELS USING TEST SET METRICS
+# ============================================================
+
+metric_results = []
+
+print("\n========== COMPARISON OF ALL SIX MODELS ==========\n")
+
+for name, model in models:
+
+    # Create a separate pipeline for each model
+    model_pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("model", model)
+    ])
+
+    # Train on training data
+    model_pipeline.fit(X_train, y_train)
+
+    # Predict on unseen test data
+    predictions = model_pipeline.predict(X_test)
+
+    # Get malignant-class probabilities
+    # Obtain continuous scores for ROC-AUC
+    if hasattr(model_pipeline, "predict_proba"):
+        probabilities = model_pipeline.predict_proba(X_test)[:, 1]
+    else:
+        probabilities = model_pipeline.decision_function(X_test)
+
+    # Calculate evaluation metrics
+    acc = accuracy_score(y_test, predictions)
+    prec = precision_score(y_test, predictions, zero_division=0)
+    rec = recall_score(y_test, predictions, zero_division=0)
+    f1 = f1_score(y_test, predictions, zero_division=0)
+    auc = roc_auc_score(y_test, probabilities)
+
+    metric_results.append({
+        "Model": name,
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1-Score": f1,
+        "ROC-AUC": auc
+    })
+
+# Create a comparison table
+metrics_df = pd.DataFrame(metric_results)
+
+print(metrics_df.round(4).to_string(index=False))
+
+# Save results for project documentation
+metrics_df.to_csv("model_evaluation_comparison.csv", index=False)
+
+print("\nModel comparison saved successfully.")
+
 
 # ============================================================
 
@@ -489,41 +558,39 @@ plt.savefig(
 
 plt.close()
 
-# ============================================================
-
-# 17. PREDICTION FOR A NEW PATIENT
 
 # ============================================================
+# 17. PREDICTION ON A HELD-OUT TEST SAMPLE
+# ============================================================
 
-# 30 diagnostic measurements for a new patient.
+# Select one sample from the test dataset.
+# This sample was not used during model training.
 
-value = [[17.99,10.38,122.8,1001,0.1184,0.2776,0.3001,0.1471,0.2419,0.07871,1.095,0.9053,
-8.589,153.4,0.006399,0.04904,0.05373,0.01587,0.03003,0.006193,25.38,17.33,184.6,2019,0.1622,0.6656,0.7119,0.2654,0.4601,0.1189
-]]
+sample_features = X_test[0].reshape(1, -1)
+actual_diagnosis = y_test[0]
 
-# The pipeline automatically applies the SAME scaler
+# Predict the diagnosis.
+sample_prediction = final_pipeline.predict(sample_features)
 
-# that was fitted during model training.
+# Calculate estimated probability of malignant class.
+malignant_probability = final_pipeline.predict_proba(
+    sample_features
+)[0][1]
 
-new_prediction = final_pipeline.predict(value)
-
-malignant_probability = (
-final_pipeline.predict_proba(value)[0][1]
-)
-
-print("\n================ NEW PATIENT PREDICTION ================\n")
-
-if new_prediction[0] == 1:
-
-
-    print("Prediction: Malignant")
-
-
-else:
-
-    print("Prediction: Benign")
+# Display results.
+print("\n========== HELD-OUT SAMPLE PREDICTION ==========\n")
 
 print(
-f"Estimated probability of malignant class: "
-f"{malignant_probability * 100:.2f}%"
+    "Actual Diagnosis:",
+    "Malignant" if actual_diagnosis == 1 else "Benign"
+)
+
+print(
+    "Predicted Diagnosis:",
+    "Malignant" if sample_prediction[0] == 1 else "Benign"
+)
+
+print(
+    f"Estimated Malignant-Class Probability: "
+    f"{malignant_probability * 100:.2f}%"
 )

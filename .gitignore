@@ -1,0 +1,19 @@
+# Python virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# IDE files
+.vscode/
+
+# Large datasets
+dataset_cancer_v1/
+ZIP FILEE/
+BreastCancerZip.zip
+
+# Temporary files
+.ipynb_checkpoints/
+*.log
